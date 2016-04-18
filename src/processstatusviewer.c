@@ -16,42 +16,32 @@
 
 #include "processstatusviewer.h"
 
-/* Menu Configuration START */
-#define MENU_NUM 2
-void total_process_list_cb(void *data, Evas_Object *obj, void *event_info);
-void process_tree_cb(void *data, Evas_Object *obj, void *event_info);
-
-const char gMenuNames[MENU_NUM][50] = { "Total Process List",
-		"Process Tree" };
-
-Evas_Smart_Cb gMenuCallbacks[MENU_NUM] = { total_process_list_cb,
-		process_tree_cb };
-/* Menu Configuration END */
-
 /* App Evas Objects: It contains Evas objects, which is main layout of the application */
 typedef struct app_evas_objs {
 	Evas_Object *mWindow;
 	Evas_Object *mConformant;
 	Evas_Object *mNaviFrame;
 	Evas_Object *mBaseLayout;
-	Evas_Object *mPanel;
-	Evas_Object *mPanelList;
+	Evas_Object *mSidePanel;
+	Evas_Object *mSidePanelList;
 	Evas_Object *mGenList;
 } app_eobjs_s;
 
-/* Process Data */
+/* Process Info View Objects */
 typedef struct process_info_evas_objs {
-	Evas_Object *to;
-	Evas_Object *subject;
 	Evas_Object *content;
-	Evas_Object *popup;
 
 	app_eobjs_s *mAppEobjs;
 } proc_info_eobjs_s;
 
-/* List Item Data */
+/* Total Process List Item Data */
 typedef struct list_item_evas_objs {
-	int index;
+	/* Process list item information */
+	int pid;
+	char process_name[100];
+
+	/*********************************/
+
 	Elm_Object_Item *mItem;
 
 	app_eobjs_s *mAppEobjs;
@@ -62,31 +52,18 @@ static void win_delete_request_cb(void *data, Evas_Object *obj,
 	ui_app_exit();
 }
 
-static Evas_Object*
-create_favorite_icon(Evas_Object *parent) {
-	Evas_Object *img = elm_image_add(parent);
-	char buf[PATH_MAX];
-
-	snprintf(buf, sizeof(buf), "%s/favorite.png", ICON_DIR);
-	elm_image_file_set(img, buf, NULL);
-	evas_object_color_set(img, 255, 180, 0, 255);
-	evas_object_size_hint_align_set(img, EVAS_HINT_FILL, EVAS_HINT_FILL);
-	evas_object_size_hint_weight_set(img, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
-	return img;
-}
-
-static Eina_Bool nf_it_pop_cb(void *data, Elm_Object_Item *it) {
+static Eina_Bool naviframe_pop_cb(void *data, Elm_Object_Item *it) {
 	/* Don't pop the last view but hide window */
-	app_eobjs_s *ad = data;
-	elm_win_lower(ad->mWindow);
+	app_eobjs_s *appEobjs = data;
+	elm_win_lower(appEobjs->mWindow);
 	return EINA_FALSE;
 }
 
 static void back_button_clicked_cb(void *data, Evas_Object * obj,
 		void *event_info) {
-	proc_info_eobjs_s *cd = data;
-	app_eobjs_s *ad = cd->mAppEobjs;
-	elm_naviframe_item_pop(ad->mNaviFrame);
+	proc_info_eobjs_s *procInfoEobjs = data;
+	app_eobjs_s *appEobjs = procInfoEobjs->mAppEobjs;
+	elm_naviframe_item_pop(appEobjs->mNaviFrame);
 }
 
 static Evas_Object *
@@ -126,23 +103,23 @@ create_box(Evas_Object *parent) {
 
 static Evas_Object*
 create_entry(Evas_Object *parent, char *text, char *guide) {
-	Evas_Object *entry;
-	entry = elm_entry_add(parent);
+	Evas_Object *label;
+	label = elm_label_add(parent);
 
-	if (text)
-		elm_object_text_set(entry, text);
-	if (guide)
-		elm_object_part_text_set(entry, "elm.guide", guide);
-	evas_object_show(entry);
+//	if (text)
+		elm_object_text_set(label, guide);
+//	if (guide)
+//		elm_object_part_text_set(entry, "elm.guide", guide);
+	evas_object_show(label);
 
-	return entry;
+	return label;
 }
 
 static void left_panel_button_clicked_cb(void *data, Evas_Object * obj,
 		void *event_info) {
-	app_eobjs_s *ad = data;
-	if (!elm_object_disabled_get(ad->mPanel))
-		elm_panel_toggle(ad->mPanel);
+	app_eobjs_s *appEobjs = data;
+	if (!elm_object_disabled_get(appEobjs->mSidePanel))
+		elm_panel_toggle(appEobjs->mSidePanel);
 }
 
 static void panel_scroll_cb(void *data, Evas_Object *obj, void *event_info) {
@@ -157,9 +134,12 @@ static void list_clicked_cb(void *data, Evas_Object *obj, void *event_info) {
 	Elm_Object_Item *it = (Elm_Object_Item *) elm_list_selected_item_get(obj);
 	if (it == NULL)
 		return;
-	elm_object_item_part_text_set(elm_naviframe_top_item_get(appEobjs->mNaviFrame), NULL,
+	elm_object_item_part_text_set(
+			elm_naviframe_top_item_get(appEobjs->mNaviFrame), NULL,
 			elm_object_item_part_text_get(it, "default"));
 	elm_list_item_selected_set(it, EINA_FALSE);
+
+	elm_panel_toggle(appEobjs->mSidePanel);
 }
 
 static void list_back_cb(void *data, Evas_Object *obj, void *event_info) {
@@ -175,7 +155,8 @@ void process_tree_cb(void *data, Evas_Object *obj, void *event_info) {
 	/* Add your application logic. */
 }
 
-static void gl_del_cb(void *data, Evas_Object *obj EINA_UNUSED) {
+/* GenList callbacks START */
+static void genlist_del_cb(void *data, Evas_Object *obj EINA_UNUSED) {
 	/* FIXME: Unrealized callback can be called after this. */
 	/* Accessing list_item_eobjs_s can be dangerous on unrealized callback. */
 	list_item_eobjs_s *listItemEobjs = data;
@@ -183,28 +164,21 @@ static void gl_del_cb(void *data, Evas_Object *obj EINA_UNUSED) {
 }
 
 static char *
-gl_text_get_cb(void *data, Evas_Object *obj, const char *part) {
+genlist_text_get_cb(void *data, Evas_Object *obj, const char *part) {
 	list_item_eobjs_s *listItemEobjs = data;
-	const Elm_Genlist_Item_Class *genlistItemClass = elm_genlist_item_item_class_get(
+	const Elm_Genlist_Item_Class *itemClass = elm_genlist_item_item_class_get(
 			listItemEobjs->mItem);
 	char buf[1024];
 
-	if (!strcmp(genlistItemClass->item_style, "group_index")) {
+	if (!strcmp(itemClass->item_style, "type1")) {
 		if (!strcmp(part, "elm.text")) {
-			snprintf(buf, 1023, "%s %d", "Group Index", listItemEobjs->index);
-			return strdup(buf);
-		}
-	} else if (!strcmp(genlistItemClass->item_style, "type1")) {
-		if (!strcmp(part, "elm.text")) {
-			snprintf(buf, 1023, "[%d]%s:%s", listItemEobjs->index, part, "Subject");
+			snprintf(buf, 1023, "(pid #) process name");
 			return strdup(buf);
 		} else if (!strcmp(part, "elm.text.sub")) {
-			snprintf(buf, 1023, "%s", "Content text will be written here");
+			snprintf(buf, 1023, "%s", "Additional Information");
 			return strdup(buf);
 		} else if (!strcmp(part, "elm.text.sub.end")) {
-			int month = 7;
-			int date = 14;
-			snprintf(buf, 1023, "[%d/%d]", month, date);
+			snprintf(buf, 1023, "%s", "Side");
 			return strdup(buf);
 		}
 	}
@@ -212,41 +186,12 @@ gl_text_get_cb(void *data, Evas_Object *obj, const char *part) {
 	return NULL;
 }
 
-static Evas_Object*
-gl_content_get_cb(void *data, Evas_Object *obj, const char *part) {
-	list_item_eobjs_s *listItemEobjs = data;
-	const Elm_Genlist_Item_Class *itc = elm_genlist_item_item_class_get(
-			listItemEobjs->mItem);
-	Evas_Object *content = NULL;
-
-	if (!strcmp(itc->item_style, "type1")) {
-		if (!strcmp(part, "elm.swallow.icon.1")) {
-			content = elm_layout_add(obj);
-			elm_layout_theme_set(content, "layout", "list/A/right.icon",
-					"default");
-			Evas_Object *img = create_favorite_icon(content);
-			elm_layout_content_set(content, "elm.swallow.content", img);
-		}
-	}
-
-	return content;
-}
-
-static void gl_loaded_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
-		void *event_info EINA_UNUSED) {
+static void genlist_loaded_cb(void *data EINA_UNUSED,
+		Evas_Object *obj EINA_UNUSED, void *event_info EINA_UNUSED) {
 
 }
 
-static void gl_realized_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
-		void *event_info) {
-	/* If you need, you can get item's data. */
-	/*
-	 Elm_Object_Item *objectItem = event_info;
-	 list_item_eobjs_s *listItemEobjs = elm_object_item_data_get(objectItem);
-	 */
-}
-
-static void gl_longpressed_cb(void *data EINA_UNUSED,
+static void genlist_realized_cb(void *data EINA_UNUSED,
 		Evas_Object *obj EINA_UNUSED, void *event_info) {
 	/* If you need, you can get item's data. */
 	/*
@@ -255,21 +200,30 @@ static void gl_longpressed_cb(void *data EINA_UNUSED,
 	 */
 }
 
-static void gl_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
-		void *event_info) {
+static void genlist_longpressed_cb(void *data EINA_UNUSED,
+		Evas_Object *obj EINA_UNUSED, void *event_info) {
+	/* If you need, you can get item's data. */
+	/*
+	 Elm_Object_Item *objectItem = event_info;
+	 list_item_eobjs_s *listItemEobjs = elm_object_item_data_get(objectItem);
+	 */
+}
+
+static void genlist_selected_cb(void *data EINA_UNUSED,
+		Evas_Object *obj EINA_UNUSED, void *event_info) {
 	Elm_Object_Item *objectItem = event_info;
 	list_item_eobjs_s *listItemEobjs = elm_object_item_data_get(objectItem);
 
 	/* Remove highlight from item */
 	elm_genlist_item_selected_set(listItemEobjs->mItem, EINA_FALSE);
 
-	app_eobjs_s *ad = listItemEobjs->mAppEobjs;
-	proc_info_eobjs_s *cd = calloc(1, sizeof(proc_info_eobjs_s));
-	cd->mAppEobjs = ad;
+	app_eobjs_s *appEobjs = listItemEobjs->mAppEobjs;
+	proc_info_eobjs_s *procInfoEobjs = calloc(1, sizeof(proc_info_eobjs_s));
+	procInfoEobjs->mAppEobjs = appEobjs;
 	Evas_Object *btn, *scroller, *main_box, *to, *subject, *content;
-	Elm_Object_Item *nf_it;
+	Elm_Object_Item *naviFrameItem;
 
-	scroller = create_scroller(ad->mNaviFrame);
+	scroller = create_scroller(appEobjs->mNaviFrame);
 
 	/* append box */
 	main_box = create_box(scroller);
@@ -278,38 +232,26 @@ static void gl_selected_cb(void *data EINA_UNUSED, Evas_Object *obj EINA_UNUSED,
 	elm_box_padding_set(main_box, 0, 30);
 	elm_object_content_set(scroller, main_box);
 
-	/* to */
-	to = create_entry(main_box, NULL, "To");
-	evas_object_size_hint_weight_set(to, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
-	evas_object_size_hint_align_set(to, EVAS_HINT_FILL, EVAS_HINT_FILL);
-	elm_box_pack_end(main_box, to);
-	cd->to = to;
-
-	/* subject */
-	subject = create_entry(main_box, NULL, "Subject");
-	evas_object_size_hint_weight_set(subject, EVAS_HINT_EXPAND,
-	EVAS_HINT_EXPAND);
-	evas_object_size_hint_align_set(subject, EVAS_HINT_FILL, EVAS_HINT_FILL);
-	elm_box_pack_end(main_box, subject);
-	cd->subject = subject;
-
 	/* content */
 	content = create_entry(main_box, NULL, "Content");
 	evas_object_size_hint_weight_set(content, EVAS_HINT_EXPAND,
 	EVAS_HINT_EXPAND);
 	evas_object_size_hint_align_set(content, EVAS_HINT_FILL, EVAS_HINT_FILL);
 	elm_box_pack_end(main_box, content);
-	cd->content = content;
+	procInfoEobjs->content = content;
 
-	nf_it = elm_naviframe_item_push(ad->mNaviFrame, "Process # (Name)", NULL, NULL,
-			scroller, NULL);
+	naviFrameItem = elm_naviframe_item_push(appEobjs->mNaviFrame,
+			"Process # (Name)", NULL, NULL, scroller, NULL);
 
 	/* back button */
-	btn = create_button(ad->mNaviFrame, "naviframe/title_done", NULL);
-	evas_object_smart_callback_add(btn, "clicked", back_button_clicked_cb, cd);
-	elm_object_item_part_content_set(nf_it, "title_left_btn", btn);
+	btn = create_button(appEobjs->mNaviFrame, "naviframe/title_done", NULL);
+	evas_object_smart_callback_add(btn, "clicked", back_button_clicked_cb,
+			procInfoEobjs);
+	elm_object_item_part_content_set(naviFrameItem, "title_left_btn", btn);
 }
+/* GenList callbacks END */
 
+/* Create base layout */
 static Evas_Object*
 create_base_layout(Evas_Object *parent_eobj) {
 	Evas_Object *layout;
@@ -320,8 +262,9 @@ create_base_layout(Evas_Object *parent_eobj) {
 	return layout;
 }
 
+/* Create side panel */
 static Evas_Object*
-create_panel(Evas_Object *parent_eobj) {
+create_side_panel(Evas_Object *parent_eobj) {
 	Evas_Object *panel, *bg;
 
 	panel = elm_panel_add(parent_eobj);
@@ -340,14 +283,16 @@ create_panel(Evas_Object *parent_eobj) {
 	return panel;
 }
 
+/* Create side panel list */
 static Evas_Object*
-create_panel_list(Evas_Object *parent_eobj) {
+create_side_panel_list(Evas_Object *parent_eobj) {
 	Evas_Object *list;
 
 	list = elm_list_add(parent_eobj);
 	elm_list_mode_set(list, ELM_LIST_COMPRESS);
 	for (int i = 0; i < MENU_NUM; i++) {
-		elm_list_item_append(list, gMenuNames[i], NULL, NULL, gMenuCallbacks[i], NULL);
+		elm_list_item_append(list, gMenuNames[i], NULL, NULL, gMenuCallbacks[i],
+				NULL);
 	}
 
 	evas_object_show(list);
@@ -355,6 +300,7 @@ create_panel_list(Evas_Object *parent_eobj) {
 	return list;
 }
 
+/* Create Genlist */
 static Evas_Object*
 create_genlist(app_eobjs_s *app_eobjs, Evas_Object *parent_eobj) {
 	Evas_Object *genlist;
@@ -363,18 +309,11 @@ create_genlist(app_eobjs_s *app_eobjs, Evas_Object *parent_eobj) {
 	int index;
 
 	/* Create item class */
-	Elm_Genlist_Item_Class *gitc = elm_genlist_item_class_new();
-	Elm_Genlist_Item_Class *itc = elm_genlist_item_class_new();
+	Elm_Genlist_Item_Class *itemClass = elm_genlist_item_class_new();
 
-	gitc->item_style = "group_index";
-	gitc->func.text_get = gl_text_get_cb;
-	gitc->func.content_get = gl_content_get_cb;
-	gitc->func.del = gl_del_cb;
-
-	itc->item_style = "type1";
-	itc->func.text_get = gl_text_get_cb;
-	itc->func.content_get = gl_content_get_cb;
-	itc->func.del = gl_del_cb;
+	itemClass->item_style = "type1";
+	itemClass->func.text_get = genlist_text_get_cb;
+	itemClass->func.del = genlist_del_cb;
 
 	genlist = elm_genlist_add(parent_eobj);
 
@@ -391,69 +330,60 @@ create_genlist(app_eobjs_s *app_eobjs, Evas_Object *parent_eobj) {
 	elm_genlist_mode_set(genlist, ELM_LIST_COMPRESS);
 
 	/* Add Smart Callback */
-	evas_object_smart_callback_add(genlist, "realized", gl_realized_cb, NULL);
-	evas_object_smart_callback_add(genlist, "loaded", gl_loaded_cb, NULL);
-	evas_object_smart_callback_add(genlist, "longpressed", gl_longpressed_cb,
-	NULL);
+	evas_object_smart_callback_add(genlist, "realized", genlist_realized_cb,
+			NULL);
+	evas_object_smart_callback_add(genlist, "loaded", genlist_loaded_cb, NULL);
+	evas_object_smart_callback_add(genlist, "longpressed",
+			genlist_longpressed_cb,
+			NULL);
 
-	int group_count = 0;
 	for (index = 0; index < n_items; index++) {
 		list_item_eobjs_s *id = calloc(sizeof(list_item_eobjs_s), 1);
-		id->index = index;
 		id->mAppEobjs = app_eobjs;
-		if (index % 10 == 0) {
-			group_count++;
-			id->index = group_count;
-			git = elm_genlist_item_append(genlist, /* genlist object */
-			gitc, /* item class */
-			id, /* item class user data */
-			NULL, ELM_GENLIST_ITEM_GROUP, /* item type */
-			gl_selected_cb, /* select smart callback */
-			id); /* smart callback user data */
-			id->mItem = git;
-		} else {
-			it = elm_genlist_item_append(genlist, /* genlist object */
-			itc, /* item class */
-			id, /* item class user data */
-			git, /* parent item */
-			ELM_GENLIST_ITEM_NONE, /* item type */
-			gl_selected_cb, /* select smart callback */
-			id); /* smart callback user data */
-			id->mItem = it;
-		}
+		it = elm_genlist_item_append(genlist, /* genlist object */
+		itemClass, /* item class */
+		id, /* item class user data */
+		NULL, /* parent item */
+		ELM_GENLIST_ITEM_NONE, /* item type */
+		genlist_selected_cb, /* select smart callback */
+		id); /* smart callback user data */
+		id->mItem = it;
 	}
-	elm_genlist_item_class_free(gitc);
-	elm_genlist_item_class_free(itc);
+	elm_genlist_item_class_free(itemClass);
 	evas_object_show(genlist);
 
 	return genlist;
 }
 
+/* Create main view */
 static Evas_Object*
 create_main_view(app_eobjs_s *app_eobjs) {
 	Evas_Object *layout;
 	/* Drawer layout */
 	layout = create_base_layout(app_eobjs->mConformant);
 
-	/* Panel */
-	app_eobjs->mPanel = create_panel(layout);
-	elm_object_part_content_set(layout, "elm.swallow.left", app_eobjs->mPanel);
+	/* Main panel */
+	app_eobjs->mSidePanel = create_side_panel(layout);
+	elm_object_part_content_set(layout, "elm.swallow.left",
+			app_eobjs->mSidePanel);
 
-	/* Panel list */
-	app_eobjs->mPanelList = create_panel_list(app_eobjs->mPanel);
-	evas_object_size_hint_weight_set(app_eobjs->mPanelList, EVAS_HINT_EXPAND,
-	EVAS_HINT_EXPAND);
-	evas_object_size_hint_align_set(app_eobjs->mPanelList, EVAS_HINT_FILL,
+	/* Main panel list */
+	app_eobjs->mSidePanelList = create_side_panel_list(app_eobjs->mSidePanel);
+	evas_object_size_hint_weight_set(app_eobjs->mSidePanelList,
+			EVAS_HINT_EXPAND,
+			EVAS_HINT_EXPAND);
+	evas_object_size_hint_align_set(app_eobjs->mSidePanelList, EVAS_HINT_FILL,
 	EVAS_HINT_FILL);
-	evas_object_smart_callback_add(app_eobjs->mPanelList, "selected", list_clicked_cb,
-			app_eobjs);
-	eext_object_event_callback_add(app_eobjs->mPanelList, EEXT_CALLBACK_BACK,
-			list_back_cb, app_eobjs->mPanel);
-	elm_object_content_set(app_eobjs->mPanel, app_eobjs->mPanelList);
+	evas_object_smart_callback_add(app_eobjs->mSidePanelList, "selected",
+			list_clicked_cb, app_eobjs);
+	eext_object_event_callback_add(app_eobjs->mSidePanelList,
+			EEXT_CALLBACK_BACK, list_back_cb, app_eobjs->mSidePanel);
+	elm_object_content_set(app_eobjs->mSidePanel, app_eobjs->mSidePanelList);
 
 	return layout;
 }
 
+/* Create base GUI */
 static void create_base_gui(app_eobjs_s *app_eobjs) {
 	Evas_Object *leftBtn, *background;
 	Elm_Object_Item *naviFrameItem;
@@ -485,7 +415,8 @@ static void create_base_gui(app_eobjs_s *app_eobjs) {
 	/* Indicator BG */
 	background = elm_bg_add(app_eobjs->mConformant);
 	elm_object_style_set(background, "indicator/headerbg");
-	elm_object_part_content_set(app_eobjs->mConformant, "elm.swallow.indicator_bg", background);
+	elm_object_part_content_set(app_eobjs->mConformant,
+			"elm.swallow.indicator_bg", background);
 	evas_object_show(background);
 
 	/* Main View */
@@ -496,15 +427,16 @@ static void create_base_gui(app_eobjs_s *app_eobjs) {
 	app_eobjs->mNaviFrame = elm_naviframe_add(app_eobjs->mBaseLayout);
 	eext_object_event_callback_add(app_eobjs->mNaviFrame, EEXT_CALLBACK_BACK,
 			eext_naviframe_back_cb, app_eobjs);
-	elm_object_part_content_set(app_eobjs->mBaseLayout, "elm.swallow.content", app_eobjs->mNaviFrame);
+	elm_object_part_content_set(app_eobjs->mBaseLayout, "elm.swallow.content",
+			app_eobjs->mNaviFrame);
 	evas_object_show(app_eobjs->mNaviFrame);
 
 	/* Genlist */
 	app_eobjs->mGenList = create_genlist(app_eobjs, app_eobjs->mBaseLayout);
 
-	naviFrameItem = elm_naviframe_item_push(app_eobjs->mNaviFrame, "Total Process List", NULL, NULL,
-			app_eobjs->mGenList, NULL);
-	elm_naviframe_item_pop_cb_set(naviFrameItem, nf_it_pop_cb, app_eobjs);
+	naviFrameItem = elm_naviframe_item_push(app_eobjs->mNaviFrame,
+			gMenuNames[0], NULL, NULL, app_eobjs->mGenList, NULL);
+	elm_naviframe_item_pop_cb_set(naviFrameItem, naviframe_pop_cb, app_eobjs);
 
 	/* left panel toggle button */
 	leftBtn = create_button(app_eobjs->mNaviFrame, "naviframe/drawers", NULL);
@@ -594,7 +526,8 @@ int main(int argc, char *argv[]) {
 	ui_app_add_event_handler(&handlers[APP_EVENT_LOW_MEMORY],
 			APP_EVENT_LOW_MEMORY, ui_app_low_memory, &app_eobjs);
 	ui_app_add_event_handler(&handlers[APP_EVENT_DEVICE_ORIENTATION_CHANGED],
-			APP_EVENT_DEVICE_ORIENTATION_CHANGED, ui_app_orient_changed, &app_eobjs);
+			APP_EVENT_DEVICE_ORIENTATION_CHANGED, ui_app_orient_changed,
+			&app_eobjs);
 	ui_app_add_event_handler(&handlers[APP_EVENT_LANGUAGE_CHANGED],
 			APP_EVENT_LANGUAGE_CHANGED, ui_app_lang_changed, &app_eobjs);
 	ui_app_add_event_handler(&handlers[APP_EVENT_REGION_FORMAT_CHANGED],

@@ -36,5 +36,16 @@
 
 #define ICON_DIR "/opt/usr/apps/skku.ospractice.psviewer/res/images"
 
+/* Menu Configuration START */
+#define MENU_NUM 2
+void total_process_list_cb(void *data, Evas_Object *obj, void *event_info);
+void process_tree_cb(void *data, Evas_Object *obj, void *event_info);
+
+const char gMenuNames[MENU_NUM][50] = { "Total Process List",
+		"Process Tree" };
+
+Evas_Smart_Cb gMenuCallbacks[MENU_NUM] = { total_process_list_cb,
+		process_tree_cb };
+/* Menu Configuration END */
 
 #endif /* __processstatusviewer_H__ */
