@@ -13,7 +13,7 @@ void back_button_clicked_cb(void *data, Evas_Object * obj, void *event_info) {
 }
 
 void create_detailed_box(list_item_eobjs_s* listItemEobjs) {
-	Evas_Object *detailed_box, *backBtn, *scroller, *contents;
+	Evas_Object *detailed_box, *backBtn, *scroller, *contentsLabel;
 	Elm_Object_Item *detailedNaviFrameItem;
 	app_eobjs_s *appEobjs = listItemEobjs->mAppEobjs;
 
@@ -41,21 +41,21 @@ void create_detailed_box(list_item_eobjs_s* listItemEobjs) {
 	char str_buf[1000];
 	sprintf(str_buf, "Specific information of process %s (pid %d)\n......",
 			process_name, pid);
-	contents = create_label(detailed_box, str_buf);
-	/**************************************/
+	contentsLabel = create_label(detailed_box, str_buf);
+	/*****************************************/
 
-	evas_object_size_hint_weight_set(contents, EVAS_HINT_EXPAND,
+	evas_object_size_hint_weight_set(contentsLabel, EVAS_HINT_EXPAND,
 	EVAS_HINT_EXPAND);
-	evas_object_size_hint_align_set(contents, EVAS_HINT_FILL, EVAS_HINT_FILL);
-	elm_box_pack_end(detailed_box, contents);
-	procInfoEobjs->content = contents;
+	evas_object_size_hint_align_set(contentsLabel, EVAS_HINT_FILL, EVAS_HINT_FILL);
+	elm_box_pack_end(detailed_box, contentsLabel);
+	procInfoEobjs->content = contentsLabel;
 
 	/* TODO: Update title of detailed box */
 	char str_buf2[1000];
 	sprintf(str_buf2, "%s (%d)", process_name, pid);
 	detailedNaviFrameItem = elm_naviframe_item_push(appEobjs->mNaviFrame,
 			str_buf2, NULL, NULL, scroller, NULL);
-	/***********************************/
+	/**************************************/
 
 	/* back button */
 	backBtn = create_button(appEobjs->mNaviFrame, "naviframe/title_done", NULL);
@@ -64,6 +64,4 @@ void create_detailed_box(list_item_eobjs_s* listItemEobjs) {
 	elm_object_item_part_content_set(detailedNaviFrameItem, "title_left_btn",
 			backBtn);
 }
-
-
 
