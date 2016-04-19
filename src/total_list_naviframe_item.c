@@ -1,5 +1,6 @@
 /*
  * total_process_list.c
+ * Author: Gyeonghwan Hong
  */
 
 #include "total_list_naviframe_item.h"

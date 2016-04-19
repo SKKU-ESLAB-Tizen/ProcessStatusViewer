@@ -1,5 +1,6 @@
 /*
  * psviewer.c
+ * Author: Gyeonghwan Hong
  */
 
 #include "psviewer.h"

@@ -1,5 +1,6 @@
 /*
  * base_gui.c
+ * Author: Gyeonghwan Hong
  */
 
 #include "base_gui.h"

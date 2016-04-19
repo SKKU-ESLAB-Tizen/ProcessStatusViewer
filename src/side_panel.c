@@ -1,5 +1,6 @@
 /*
  * side_panel.c
+ * Author: Gyeonghwan Hong
  */
 #include "side_panel.h"
 

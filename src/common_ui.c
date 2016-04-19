@@ -1,5 +1,6 @@
 /*
  * common_ui.c
+ * Author: Gyeonghwan Hong
  */
 #include "common_ui.h"
 

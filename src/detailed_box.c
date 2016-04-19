@@ -1,5 +1,6 @@
 /*
  * detailed_box.c
+ * Author: Gyeonghwan Hong
  */
 
 #include "detailed_box.h"

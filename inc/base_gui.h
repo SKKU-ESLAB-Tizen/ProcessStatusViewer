@@ -1,5 +1,6 @@
 /*
  * base_gui.h
+ * Author: Gyeonghwan Hong
  */
 
 #ifndef BASE_GUI_H_

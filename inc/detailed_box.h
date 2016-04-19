@@ -1,5 +1,6 @@
 /*
  * detailed_box.h
+ * Author: Gyeonghwan Hong
  */
 
 #ifndef DETAILED_BOX_H_

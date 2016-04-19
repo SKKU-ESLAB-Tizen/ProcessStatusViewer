@@ -1,5 +1,6 @@
 /*
  * side_panel.h
+ * Author: Gyeonghwan Hong
  */
 
 #ifndef SIDE_PANEL_H_

@@ -1,5 +1,6 @@
 /*
  * common_ui.h
+ * Author: Gyeonghwan Hong
  */
 
 #ifndef COMMON_UI_H_

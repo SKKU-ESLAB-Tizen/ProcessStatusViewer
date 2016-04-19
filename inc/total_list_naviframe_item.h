@@ -1,8 +1,6 @@
 /*
  * total_list_naviframe_item.h
- *
- *  Created on: Apr 19, 2016
- *      Author: redcarrottt
+ * Author: Gyeonghwan Hong
  */
 
 #ifndef TOTAL_LIST_NAVIFRAME_ITEM_H_
